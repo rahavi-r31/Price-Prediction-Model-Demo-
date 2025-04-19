@@ -9,9 +9,7 @@ import base64
 from datetime import datetime, timedelta
 import os
 from keras.models import load_model
-from your_custom_layer_file import DIALSTM_GRU  # Make sure this is correct
-
-
+from dialstm_gru_layer import DIALSTM_GRU  # Make sure this is correct
 
 app = Flask(__name__)
 
