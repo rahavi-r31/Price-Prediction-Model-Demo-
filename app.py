@@ -12,7 +12,7 @@ import os
 app = Flask(__name__)
 
 # Load model on startup
-model = tf.keras.models.load_model("model.h5")
+model = tf.keras.models.load_model("pretrained_lstm.h5")
 
 # Global variables - to be populated from your dataset
 min_price = 0
