@@ -8,11 +8,15 @@ import io
 import base64
 from datetime import datetime, timedelta
 import os
+from keras.models import load_model
+from your_custom_layer_file import DIALSTM_GRU  # Make sure this is correct
+
+
 
 app = Flask(__name__)
 
 # Load model on startup
-model = tf.keras.models.load_model("pretrained_lstm.h5")
+model = load_model("pretrained_lstm.h5", custom_objects={'DIALSTM_GRU': DIALSTM_GRU})
 
 # Global variables - to be populated from your dataset
 min_price = 0
