@@ -9,12 +9,46 @@ import base64
 from datetime import datetime, timedelta
 import os
 from keras.models import load_model
-from dialstm_gru_layer import DIALSTM_GRU  # Make sure this is correct
+
 
 app = Flask(__name__)
 
-# Load model on startup
-model = load_model("pretrained_lstm.h5", custom_objects={'DIALSTM_GRU': DIALSTM_GRU})
+import tensorflow as tf
+from tensorflow.keras import layers
+
+class DIALSTM_GRU(layers.Layer):
+    def __init__(self, n_features, timesteps, batch_size, n_commodities, **kwargs):
+        super(DIALSTM_GRU, self).__init__(**kwargs)
+        self.n_features = n_features
+        self.timesteps = timesteps
+        self.batch_size = batch_size
+        self.n_commodities = n_commodities
+        
+        # Define your layer architecture here
+        self.lstm = layers.LSTM(64, return_sequences=True)
+        self.gru = layers.GRU(32)
+        # Add any other layers you used in your original model
+        
+    def call(self, inputs):
+        # Define the forward pass
+        x = self.lstm(inputs)
+        return self.gru(x)
+        
+    def get_config(self):
+        config = super(DIALSTM_GRU, self).get_config()
+        config.update({
+            'n_features': self.n_features,
+            'timesteps': self.timesteps,
+            'batch_size': self.batch_size,
+            'n_commodities': self.n_commodities
+        })
+        return config
+        
+# Register the custom layer
+tf.keras.utils.get_custom_objects()['DIALSTM_GRU'] = DIALSTM_GRU
+
+# Now load the model with custom objects
+model = tf.keras.models.load_model("pretrained_lstm.h5")
 
 # Global variables - to be populated from your dataset
 min_price = 0
