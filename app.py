@@ -82,10 +82,17 @@ def create_dummy_data():
     return pd.DataFrame(data)
 
 # Function to get most recent test sequence
+# Load your processed test data and historical data
+X_test = np.load("X_test.npy")  # Or however you're storing your test sequences
+
+# Define this inside your app.py
 def get_recent_sequence():
-    # Replace this with code to get your actual test sequence
-    # This is a placeholder that creates random data
-    return np.random.random((timesteps, n_features))
+    """
+    Returns the most recent input sequence for prediction.
+    Assumes X_test and historical_data are already loaded.
+    """
+    input_sequence = X_test[-1]  # Last known test sequence
+    return input_sequence  # Shape: (timesteps, n_features)
 
 # Generate predictions for the next 7 days
 def predict_future_prices(input_sequence, days=7):
