@@ -8,8 +8,10 @@ import base64
 from datetime import datetime, timedelta
 import os
 import tensorflow as tf
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)  # Allows all origins (for development)
 
 # Create a simple LSTM model instead of loading a custom one
 def create_simple_model(input_shape):
