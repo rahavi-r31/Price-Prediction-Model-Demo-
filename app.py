@@ -179,25 +179,35 @@ def index():
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
+        # Debugging: Print request info
+        print("Headers:", request.headers)
         print("Content-Type:", request.content_type)
-        print("Is JSON?", request.is_json)
-        print("Request data:", request.data)
+        print("Raw data:", request.data)
         
-        # Check if the request is JSON
-        if not request.is_json:
+        # Check if request has data
+        if not request.data:
             return jsonify({
                 "success": False,
-                "error": "415 Unsupported Media Type: Request must be application/json"
-            }), 415
-        
-        # Load data
-        data = get_data()
-        
+                "error": "400 Bad Request: No data received"
+            }), 400
+            
+        # Try to parse JSON
+        try:
+            json_data = request.get_json()
+            if json_data is None:
+                raise ValueError("No JSON data")
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": f"400 Bad Request: Invalid JSON - {str(e)}"
+            }), 400
+            
         # Get commodity details from request
-        commodity_code = int(request.json.get("commodity_code", 13))
-        commodity_name = request.json.get("commodity_name", "Soyabean")
+        commodity_code = int(json_data.get("commodity_code", 13))
+        commodity_name = json_data.get("commodity_name", "Soyabean")
         
-        # Rest of your code...
+        # Rest of your prediction code...
+        data = get_data()
         
         # Generate future dates
         last_date = datetime.now().date()
