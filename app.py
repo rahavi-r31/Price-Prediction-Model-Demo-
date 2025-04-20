@@ -1,6 +1,5 @@
 # app.py
 from flask import Flask, render_template, request, jsonify
-import tensorflow as tf
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,135 +7,158 @@ import io
 import base64
 from datetime import datetime, timedelta
 import os
-from keras.models import load_model
-
+import tensorflow as tf
 
 app = Flask(__name__)
 
-import tensorflow as tf
-from tensorflow.keras import layers
+# Create a simple LSTM model instead of loading a custom one
+def create_simple_model(input_shape):
+    model = tf.keras.Sequential([
+        tf.keras.layers.LSTM(64, return_sequences=True, input_shape=input_shape),
+        tf.keras.layers.LSTM(32),
+        tf.keras.layers.Dense(16, activation='relu'),
+        tf.keras.layers.Dense(1)
+    ])
+    model.compile(optimizer='adam', loss='mse')
+    return model
 
-class DIALSTM_GRU(layers.Layer):
-    def __init__(self, n_features=8, timesteps=20, batch_size=256, n_commodities=131, **kwargs):
-        super(DIALSTM_GRU, self).__init__(**kwargs)
-        self.n_features = n_features
-        self.timesteps = timesteps
-        self.batch_size = batch_size
-        self.n_commodities = n_commodities
-        
-        # Define your layer architecture here
-        self.lstm = layers.LSTM(64, return_sequences=True)
-        self.gru = layers.GRU(32)
-        # Add any other layers you used in your original model
-        
-    def call(self, inputs):
-        # Define the forward pass
-        x = self.lstm(inputs)
-        return self.gru(x)
-        
-    def get_config(self):
-        config = super(DIALSTM_GRU, self).get_config()
-        config.update({
-            'n_features': self.n_features,
-            'timesteps': self.timesteps,
-            'batch_size': self.batch_size,
-            'n_commodities': self.n_commodities
-        })
-        return config
-        
-# Register the custom layer
-tf.keras.utils.get_custom_objects()['DIALSTM_GRU'] = DIALSTM_GRU
+# Global variables
+timesteps = 10
+n_features = 1
+model = create_simple_model((timesteps, n_features))
 
-# Now load the model with custom objects
-model = tf.keras.models.load_model("pretrained_lstm.h5")
-
-# Global variables - to be populated from your dataset
-min_price = 0
-max_price = 10000  # Default values, should be replaced with actual min/max
-timesteps = 20  # Adjust based on your model architecture
-n_features = 8  # Adjust based on your model architecture
-
-# Load historical data and update min/max prices
-def load_historical_data():
-    global min_price, max_price
-    try:
-        # Replace with your actual data loading code
-        historical_data = pd.read_csv("historical_data.csv")
-        min_price = historical_data["Modal_Price"].min()
-        max_price = historical_data["Modal_Price"].max()
-        return historical_data
-    except Exception as e:
-        print(f"Error loading historical data: {e}")
-        # Return dummy data for demo if file doesn't exist
-        return create_dummy_data()
-
-def create_dummy_data():
-    """Create dummy data for demo purposes if real data is not available"""
-    dates = pd.date_range(start='2024-01-01', periods=100)
+# Generate synthetic data for demonstration
+def generate_demo_data():
+    # Create date range
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=100)
+    date_range = pd.date_range(start=start_date, end=end_date)
+    
+    # Generate prices with some trend and seasonality
+    base_price = 3500  # Base price
+    trend = np.linspace(0, 500, len(date_range))  # Upward trend
+    seasonality = 200 * np.sin(np.linspace(0, 6*np.pi, len(date_range)))  # Seasonal component
+    noise = np.random.normal(0, 100, len(date_range))  # Random noise
+    
+    prices = base_price + trend + seasonality + noise
+    prices = np.maximum(prices, 1000)  # Ensure minimum price
+    
+    # Create the dataframe
     data = {
-        'Arrival_Date': dates,
-        'Modal_Price': np.random.uniform(3000, 5000, 100),
-        'Commodity_Code': [13] * 100,
-        'Commodity': ['Soyabean'] * 100
+        'Arrival_Date': date_range,
+        'Modal_Price': prices,
+        'Commodity_Code': [13] * len(date_range),
+        'Commodity': ['Soyabean'] * len(date_range)
     }
+    
+    # Add more commodities
+    commodities = [
+        {'code': 1, 'name': 'Rice', 'base_price': 2500, 'factor': 0.9},
+        {'code': 2, 'name': 'Wheat', 'base_price': 2000, 'factor': 1.1},
+        {'code': 3, 'name': 'Corn', 'base_price': 1800, 'factor': 1.2},
+        {'code': 4, 'name': 'Potato', 'base_price': 1200, 'factor': 0.8}
+    ]
+    
+    for commodity in commodities:
+        commodity_prices = commodity['base_price'] + commodity['factor'] * (trend + seasonality + np.random.normal(0, 100, len(date_range)))
+        commodity_prices = np.maximum(commodity_prices, 800)
+        
+        temp_data = {
+            'Arrival_Date': date_range,
+            'Modal_Price': commodity_prices,
+            'Commodity_Code': [commodity['code']] * len(date_range),
+            'Commodity': [commodity['name']] * len(date_range)
+        }
+        
+        # Append to existing data
+        for key in data:
+            data[key] = np.append(data[key], temp_data[key])
+    
     return pd.DataFrame(data)
 
-# Function to get most recent test sequence
-# Load your processed test data and historical data
-X_test = np.load("X_test.npy")  # Or however you're storing your test sequences
+# Load or generate data
+def get_data():
+    try:
+        if os.path.exists("historical_data.csv"):
+            return pd.read_csv("historical_data.csv")
+        else:
+            # Generate and save demo data
+            data = generate_demo_data()
+            data.to_csv("demo_data.csv", index=False)
+            return data
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        return generate_demo_data()
 
-# Define this inside your app.py
-def get_recent_sequence():
-    """
-    Returns the most recent input sequence for prediction.
-    Assumes X_test and historical_data are already loaded.
-    """
-    input_sequence = X_test[-1]  # Last known test sequence
-    return input_sequence  # Shape: (timesteps, n_features)
+# Get dataset stats for scaling
+def get_scaling_params(data, commodity_code):
+    commodity_data = data[data['Commodity_Code'] == commodity_code]
+    min_price = commodity_data['Modal_Price'].min()
+    max_price = commodity_data['Modal_Price'].max()
+    return min_price, max_price
+
+# Get input sequence for a specific commodity
+def get_input_sequence(data, commodity_code):
+    # Filter data for the selected commodity
+    commodity_data = data[data['Commodity_Code'] == commodity_code]
+    
+    # Sort by date
+    commodity_data = commodity_data.sort_values('Arrival_Date')
+    
+    # Get the last timesteps prices
+    latest_prices = commodity_data['Modal_Price'].tail(timesteps).values
+    
+    # Get scaling parameters
+    min_price, max_price = get_scaling_params(data, commodity_code)
+    
+    # Scale the prices
+    scaled_prices = (latest_prices - min_price) / (max_price - min_price)
+    
+    # Reshape for LSTM input: [samples, timesteps, features]
+    return scaled_prices.reshape(1, timesteps, n_features), min_price, max_price
 
 # Generate predictions for the next 7 days
-def predict_future_prices(input_sequence, days=7):
-    future_predictions = []
+def predict_future_prices(data, commodity_code, days=7):
+    # Get input sequence and scaling parameters
+    sequence, min_price, max_price = get_input_sequence(data, commodity_code)
     
-    # Make a copy of the input sequence to avoid modifying the original
-    current_sequence = input_sequence.copy()
+    # Initialize array to store predictions
+    predictions = np.zeros(days)
+    current_sequence = sequence.copy()
     
-    for _ in range(days):
-        # Reshape for model input (batch_size, timesteps, features)
-        current_sequence_reshaped = current_sequence.reshape(1, timesteps, n_features)
+    # Make predictions one day at a time
+    for i in range(days):
+        # Predict next day
+        next_price = model.predict(current_sequence, verbose=0)[0, 0]
+        predictions[i] = next_price
         
-        # Predict next value
-        next_prediction = model.predict(current_sequence_reshaped, verbose=0)
-        
-        # Extract scalar value
-        next_prediction_value = next_prediction.item()
-        
-        # Store prediction
-        future_predictions.append(next_prediction_value)
-        
-        # Update sequence for next iteration (remove oldest, add newest)
-        current_sequence = np.roll(current_sequence, -1, axis=0)
-        current_sequence[-1, -1] = next_prediction_value  # Assume last feature is the target
+        # Update sequence for next prediction
+        current_sequence = np.roll(current_sequence, -1, axis=1)
+        current_sequence[0, -1, 0] = next_price
     
-    # Convert predictions back to original scale
-    future_predictions = np.array(future_predictions).reshape(-1, 1)
-    future_predictions_real = future_predictions * (max_price - min_price) + min_price
+    # Scale predictions back to original range
+    predictions = predictions * (max_price - min_price) + min_price
     
-    # Ensure no negative or NaN values
-    future_predictions_real = np.nan_to_num(np.maximum(future_predictions_real, 0))
-    
-    return future_predictions_real.flatten()
+    return predictions
 
 # Create a plot and return as base64 encoded image
 def create_prediction_plot(dates, prices, commodity_name):
     plt.figure(figsize=(10, 5))
-    plt.plot(dates, prices, marker="o", linestyle="dashed", color="red", 
-             label=f"Predicted Prices for {commodity_name} (₹)")
+    plt.plot(dates, prices, marker="o", linestyle="-", color="blue", 
+             label=f"Predicted Prices for {commodity_name}")
+    
+    # Formatting
     plt.xlabel("Date")
     plt.ylabel("Price (₹)")
     plt.title(f"Predicted Prices for {commodity_name} for Next 7 Days")
-    plt.legend()
     plt.grid(True, linestyle="--", alpha=0.6)
+    plt.legend()
+    
+    # Format y-axis as currency
+    plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'₹{int(x):,}'))
+    
+    # Rotate date labels for better readability
+    plt.xticks(rotation=45)
     plt.tight_layout()
     
     # Save plot to a bytes buffer
@@ -157,11 +179,11 @@ def index():
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
-        # Get the most recent sequence for prediction
-        input_sequence = get_recent_sequence()
+        # Load data
+        data = get_data()
         
         # Get commodity details from request or use default
-        commodity_code = request.json.get("commodity_code", 13)
+        commodity_code = int(request.json.get("commodity_code", 13))
         commodity_name = request.json.get("commodity_name", "Soyabean")
         
         # Generate future dates
@@ -169,7 +191,7 @@ def predict():
         future_dates = [(last_date + timedelta(days=i+1)).strftime('%Y-%m-%d') for i in range(7)]
         
         # Make predictions
-        predictions = predict_future_prices(input_sequence)
+        predictions = predict_future_prices(data, commodity_code)
         
         # Create plot
         plot_img = create_prediction_plot(future_dates, predictions, commodity_name)
@@ -189,6 +211,7 @@ def predict():
         })
     
     except Exception as e:
+        print(f"Error in prediction: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)
@@ -197,11 +220,11 @@ def predict():
 @app.route("/commodities")
 def get_commodities():
     try:
-        # Load historical data
-        historical_data = load_historical_data()
+        # Load data
+        data = get_data()
         
         # Get unique commodities
-        commodities = historical_data[["Commodity_Code", "Commodity"]].drop_duplicates().to_dict('records')
+        commodities = data[["Commodity_Code", "Commodity"]].drop_duplicates().to_dict('records')
         
         return jsonify({
             "success": True,
@@ -215,6 +238,4 @@ def get_commodities():
         })
 
 if __name__ == "__main__":
-    # Make sure to load data before starting the app
-    historical_data = load_historical_data()
     app.run(debug=True)
