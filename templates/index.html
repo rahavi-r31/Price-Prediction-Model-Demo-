@@ -3,13 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soyabean Price Predictions</title>
+    <title>{{ commodity }} Price Predictions</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body {
-            background-color: #f8f9fa;
-            padding: 20px;
-        }
+        body { background-color: #f8f9fa; padding: 20px; }
         .prediction-card {
             background: white;
             border-radius: 10px;
@@ -23,13 +20,8 @@
             padding-bottom: 10px;
             margin-bottom: 20px;
         }
-        .price-value {
-            font-weight: bold;
-            color: #27ae60;
-        }
-        .date-col {
-            font-weight: 500;
-        }
+        .price-value { font-weight: bold; color: #27ae60; }
+        .date-col { font-weight: 500; }
     </style>
 </head>
 <body>
@@ -37,7 +29,9 @@
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <div class="prediction-card">
-                    <h2 class="prediction-title text-center">Soyabean Price Predictions (Next 7 Days)</h2>
+                    <h2 class="prediction-title text-center">
+                        {{ commodity }} Price Predictions (Next 7 Days)
+                    </h2>
                     
                     <div class="table-responsive">
                         <table class="table table-hover">
@@ -48,34 +42,12 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                {% for pred in predictions %}
                                 <tr>
-                                    <td class="date-col">2025-02-03</td>
-                                    <td class="text-end price-value">₹4,148.15</td>
+                                    <td class="date-col">{{ pred.date }}</td>
+                                    <td class="text-end price-value">₹{{ "{:,.2f}".format(pred.price) }}</td>
                                 </tr>
-                                <tr>
-                                    <td class="date-col">2025-02-04</td>
-                                    <td class="text-end price-value">₹3,997.88</td>
-                                </tr>
-                                <tr>
-                                    <td class="date-col">2025-02-05</td>
-                                    <td class="text-end price-value">₹3,937.44</td>
-                                </tr>
-                                <tr>
-                                    <td class="date-col">2025-02-06</td>
-                                    <td class="text-end price-value">₹3,868.83</td>
-                                </tr>
-                                <tr>
-                                    <td class="date-col">2025-02-07</td>
-                                    <td class="text-end price-value">₹3,826.88</td>
-                                </tr>
-                                <tr>
-                                    <td class="date-col">2025-02-08</td>
-                                    <td class="text-end price-value">₹3,792.98</td>
-                                </tr>
-                                <tr>
-                                    <td class="date-col">2025-02-09</td>
-                                    <td class="text-end price-value">₹3,796.00</td>
-                                </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
@@ -83,8 +55,9 @@
                     <div class="text-center mt-4">
                         <div class="alert alert-info">
                             <strong>Model Execution Times:</strong><br>
-                            1/1 ━━━━━━━━━━━━━━━━━━━━ 1s 506ms/step (initial)<br>
-                            Subsequent predictions: 36ms-84ms/step
+                            {% for time in exec_times %}
+                            {{ time }}<br>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
