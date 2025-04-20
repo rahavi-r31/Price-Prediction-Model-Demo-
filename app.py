@@ -23,7 +23,7 @@ def show_predictions():
     ]
     
     return render_template(
-        'predictions.html',
+        'index.html',
         commodity="Soyabean",
         predictions=predictions,
         exec_times=exec_times
