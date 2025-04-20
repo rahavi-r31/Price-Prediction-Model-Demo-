@@ -17,7 +17,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 class DIALSTM_GRU(layers.Layer):
-    def __init__(self, n_features, timesteps, batch_size, n_commodities, **kwargs):
+    def __init__(self, n_features=8, timesteps=20, batch_size=256, n_commodities=131, **kwargs):
         super(DIALSTM_GRU, self).__init__(**kwargs)
         self.n_features = n_features
         self.timesteps = timesteps
