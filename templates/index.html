@@ -81,105 +81,134 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Load commodity list when page loads
-            loadCommodities();
-            
-            // Add event listener to predict button
-            document.getElementById('predictBtn').addEventListener('click', getPrediction);
-        });
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load commodity list when page loads
+        loadCommodities();
         
-        async function loadCommodities() {
-            try {
-                const response = await fetch('/commodities');
-                const data = await response.json();
-                
-                if (data.success) {
-                    const select = document.getElementById('commoditySelect');
-                    select.innerHTML = '';
-                    
-                    data.commodities.forEach(commodity => {
-                        const option = document.createElement('option');
-                        option.value = commodity.Commodity_Code;
-                        option.textContent = commodity.Commodity;
-                        option.dataset.name = commodity.Commodity;
-                        select.appendChild(option);
-                    });
-                } else {
-                    console.error('Failed to load commodities:', data.error);
-                }
-            } catch (error) {
-                console.error('Error loading commodities:', error);
+        // Add event listener to predict button
+        document.getElementById('predictBtn').addEventListener('click', getPrediction);
+    });
+    
+    async function loadCommodities() {
+        try {
+            const response = await fetch('/commodities');
+            
+            // First check if the response is OK
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                const select = document.getElementById('commoditySelect');
+                select.innerHTML = '';
+                
+                // Add a default option
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = '-- Select a commodity --';
+                defaultOption.disabled = true;
+                defaultOption.selected = true;
+                select.appendChild(defaultOption);
+                
+                data.commodities.forEach(commodity => {
+                    const option = document.createElement('option');
+                    option.value = commodity.Commodity_Code;
+                    option.textContent = commodity.Commodity;
+                    option.dataset.name = commodity.Commodity;
+                    select.appendChild(option);
+                });
+            } else {
+                console.error('Failed to load commodities:', data.error);
+                showError('Failed to load commodities. Please try again later.');
+            }
+        } catch (error) {
+            console.error('Error loading commodities:', error);
+            showError('Error loading commodities. Please refresh the page.');
+        }
+    }
+    
+    async function getPrediction() {
+        const commoditySelect = document.getElementById('commoditySelect');
+        const commodityCode = commoditySelect.value;
+        const commodityName = commoditySelect.options[commoditySelect.selectedIndex].dataset.name;
+        
+        // Validate selection
+        if (!commodityCode) {
+            showError('Please select a commodity first');
+            return;
         }
         
-        async function getPrediction() {
-            // Show loading spinner
-            document.getElementById('loadingSpinner').classList.remove('d-none');
-            document.getElementById('resultSection').classList.add('d-none');
-            document.getElementById('errorAlert').classList.add('d-none');
+        // Show loading spinner
+        document.getElementById('loadingSpinner').classList.remove('d-none');
+        document.getElementById('resultSection').classList.add('d-none');
+        document.getElementById('errorAlert').classList.add('d-none');
+        
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    commodity_code: parseInt(commodityCode),
+                    commodity_name: commodityName
+                })
+            });
             
-            const commoditySelect = document.getElementById('commoditySelect');
-            const commodityCode = commoditySelect.value;
-            const commodityName = commoditySelect.options[commoditySelect.selectedIndex].dataset.name;
+            // Check if response is OK
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
             
-            try {
-                const response = await fetch('/predict', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        commodity_code: parseInt(commodityCode),
-                        commodity_name: commodityName
-                    })
+            const result = await response.json();
+            
+            if (result.success) {
+                // Hide spinner, show results
+                document.getElementById('loadingSpinner').classList.add('d-none');
+                document.getElementById('resultSection').classList.remove('d-none');
+                
+                // Update prediction title
+                document.getElementById('predictionTitle').textContent = 
+                    `Predicted Prices for ${result.prediction_data.commodity_name}`;
+                
+                // Update table
+                const tableBody = document.getElementById('predictionTableBody');
+                tableBody.innerHTML = '';
+                
+                result.prediction_data.dates.forEach((date, index) => {
+                    const row = document.createElement('tr');
+                    
+                    const dateCell = document.createElement('td');
+                    dateCell.textContent = date;
+                    row.appendChild(dateCell);
+                    
+                    const priceCell = document.createElement('td');
+                    priceCell.textContent = `₹${result.prediction_data.prices[index].toLocaleString('en-IN')}`;
+                    row.appendChild(priceCell);
+                    
+                    tableBody.appendChild(row);
                 });
                 
-                const result = await response.json();
-                
-                if (result.success) {
-                    // Hide spinner, show results
-                    document.getElementById('loadingSpinner').classList.add('d-none');
-                    document.getElementById('resultSection').classList.remove('d-none');
-                    
-                    // Update prediction title
-                    document.getElementById('predictionTitle').textContent = 
-                        `Predicted Prices for ${result.prediction_data.commodity_name}`;
-                    
-                    // Update table
-                    const tableBody = document.getElementById('predictionTableBody');
-                    tableBody.innerHTML = '';
-                    
-                    for (let i = 0; i < result.prediction_data.dates.length; i++) {
-                        const row = document.createElement('tr');
-                        
-                        const dateCell = document.createElement('td');
-                        dateCell.textContent = result.prediction_data.dates[i];
-                        row.appendChild(dateCell);
-                        
-                        const priceCell = document.createElement('td');
-                        priceCell.textContent = `₹${result.prediction_data.prices[i].toLocaleString()}`;
-                        row.appendChild(priceCell);
-                        
-                        tableBody.appendChild(row);
-                    }
-                    
-                    // Update chart image
-                    document.getElementById('predictionChart').src = `data:image/png;base64,${result.plot}`;
-                } else {
-                    // Show error
-                    document.getElementById('loadingSpinner').classList.add('d-none');
-                    document.getElementById('errorAlert').classList.remove('d-none');
-                    document.getElementById('errorAlert').textContent = 
-                        `Error: ${result.error || 'Unknown error occurred'}`;
-                }
-            } catch (error) {
-                // Show error
-                document.getElementById('loadingSpinner').classList.add('d-none');
-                document.getElementById('errorAlert').classList.remove('d-none');
-                document.getElementById('errorAlert').textContent = 
-                    `Error: ${error.message || 'Unknown error occurred'}`;
-                console.error('Error getting prediction:', error);
+                // Update chart image
+                document.getElementById('predictionChart').src = `data:image/png;base64,${result.plot}`;
+            } else {
+                throw new Error(result.error || 'Unknown error occurred');
             }
+        } catch (error) {
+            console.error('Error getting prediction:', error);
+            showError(error.message || 'Failed to generate prediction. Please try again.');
         }
-    </script>
+    }
+    
+    function showError(message) {
+        document.getElementById('loadingSpinner').classList.add('d-none');
+        document.getElementById('errorAlert').classList.remove('d-none');
+        document.getElementById('errorAlert').textContent = message;
+    }
+</script>
 </body>
 </html>
