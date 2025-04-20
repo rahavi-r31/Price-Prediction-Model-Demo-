@@ -179,12 +179,25 @@ def index():
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
+        print("Content-Type:", request.content_type)
+        print("Is JSON?", request.is_json)
+        print("Request data:", request.data)
+        
+        # Check if the request is JSON
+        if not request.is_json:
+            return jsonify({
+                "success": False,
+                "error": "415 Unsupported Media Type: Request must be application/json"
+            }), 415
+        
         # Load data
         data = get_data()
         
-        # Get commodity details from request or use default
+        # Get commodity details from request
         commodity_code = int(request.json.get("commodity_code", 13))
         commodity_name = request.json.get("commodity_name", "Soyabean")
+        
+        # Rest of your code...
         
         # Generate future dates
         last_date = datetime.now().date()
