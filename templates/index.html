@@ -146,7 +146,7 @@
         document.getElementById('errorAlert').classList.add('d-none');
         
         try {
-            const response = await fetch('/predict', {
+            const response = await fetch('http://localhost:5001/predict', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
